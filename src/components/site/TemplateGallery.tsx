@@ -117,22 +117,46 @@ export function TemplateGallery() {
 
       const productUpload = await fal.storage.upload(productFile);
 
-      // Get the prompt for the selected template
-      const specificPrompt = (selectedTemplate ? templatePrompts[selectedTemplate] : null) || `
+      let inputPayload: any = {};
+      const isNewTemplate = selectedTemplate?.startsWith("template-");
+
+      if (isNewTemplate) {
+        const specificPrompt = templatePrompts[selectedTemplate as string] || `
 Replace the product in the template using the uploaded product image.
 Maintain exact shadows, reflections, perspective, lighting,
 camera angle, and commercial advertising style.
 Ultra realistic product photography.`;
 
-      const result = await fal.subscribe("fal-ai/flux-pro/kontext", {
-        input: {
+        inputPayload = {
           prompt: specificPrompt,
           image_url: productUpload,
+          image_size: { width: 1080, height: 1350 },
           num_images: 1,
           output_format: "png",
           safety_tolerance: "2",
           sync_mode: true
-        }
+        };
+      } else {
+        const tmplRes = await fetch(templateImgSrc);
+        const tmplBlob = await tmplRes.blob();
+        const tmplFile = new File([tmplBlob], "template.jpg", { type: tmplBlob.type });
+        const templateUpload = await fal.storage.upload(tmplFile);
+
+        inputPayload = {
+          prompt: `Image 1 is the template, Image 2 is the product. Replace the product in the template using the uploaded product image.
+Maintain exact shadows, reflections, perspective, lighting,
+camera angle, and commercial advertising style.
+Ultra realistic product photography.`,
+          image_urls: [templateUpload, productUpload],
+          num_images: 1,
+          output_format: "png",
+          safety_tolerance: "2",
+          sync_mode: true
+        };
+      }
+
+      const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
+        input: inputPayload
       });
 
       setResultData({
