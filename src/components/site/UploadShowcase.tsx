@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { Upload, Sparkles, Check } from "lucide-react";
 import { SectionHeader } from "./SectionHeader";
-import productImg from "@/assets/product-upload.jpg";
-import resultImg from "@/assets/ai-result.jpg";
+import productImg from "@/assets/template/1 (1).jpg";
+import resultImg from "@/assets/template/4 (1).jpg";
 import { useState } from "react";
 
 export function UploadShowcase() {

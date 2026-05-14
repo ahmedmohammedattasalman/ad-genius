@@ -5,29 +5,48 @@ import { toast } from "sonner";
 import { fal } from "@fal-ai/client";
 import { useTranslation } from "react-i18next";
 import { SectionHeader } from "./SectionHeader";
-import g1 from "@/assets/gallery-1.jpg";
-import g2 from "@/assets/gallery-2.jpg";
-import g3 from "@/assets/gallery-3.jpg";
-import g4 from "@/assets/gallery-4.jpg";
-import g5 from "@/assets/gallery-5.jpg";
-import g6 from "@/assets/gallery-6.jpg";
 import t1 from "@/assets/template/1 (1).jpg";
 import t3 from "@/assets/template/3 (1).jpg";
 import t4 from "@/assets/template/4 (1).jpg";
 import t5 from "@/assets/template/5 (1).jpg";
+import { templatePrompts } from "@/data/templateData";
 
-const getItems = (t: any) => [
-  { id: "neon-drop", img: g1, title: t('tmpl_neon_drop'), category: t('cat_fashion'), span: "row-span-2" },
-  { id: "noir-elegance", img: t3, title: t('tmpl_noir_elegance'), category: t('cat_fashion'), span: "" },
-  { id: "botanic", img: g2, title: t('tmpl_botanic'), category: t('cat_beauty'), span: "" },
-  { id: "forest-dew", img: t1, title: t('tmpl_forest_dew'), category: t('cat_beauty'), span: "row-span-2" },
-  { id: "midnight-gold", img: g3, title: t('tmpl_midnight_gold'), category: t('cat_luxury'), span: "" },
-  { id: "desert-oud", img: t4, title: t('tmpl_desert_oud'), category: t('cat_luxury'), span: "row-span-2" },
-  { id: "pulse", img: g4, title: t('tmpl_pulse'), category: t('cat_tech'), span: "" },
-  { id: "soft-studio", img: g5, title: t('tmpl_soft_studio'), category: t('cat_food'), span: "" },
-  { id: "stone-minimal", img: t5, title: t('tmpl_stone_minimal'), category: t('cat_lifestyle'), span: "" },
-  { id: "mirage", img: g6, title: t('tmpl_mirage'), category: t('cat_lifestyle'), span: "" },
-];
+// Dynamic import for templates 1-19
+const templateModules = import.meta.glob("../../assets/template/1-19/**/*.{png,jpg,jpeg}", { eager: true });
+const templateImageMap: Record<string, string> = {};
+
+Object.entries(templateModules).forEach(([path, module]: [string, any]) => {
+  const match = path.match(/New folder - Copy \((\d+)\)/);
+  if (match) {
+    const id = `template-${match[1]}`;
+    templateImageMap[id] = module.default || module;
+  }
+});
+
+const getItems = (t: any) => {
+  const baseItems = [
+    { id: "noir-elegance", img: t3, title: t('tmpl_noir_elegance'), category: t('cat_fashion'), span: "" },
+    { id: "forest-dew", img: t1, title: t('tmpl_forest_dew'), category: t('cat_beauty'), span: "row-span-2" },
+    { id: "desert-oud", img: t4, title: t('tmpl_desert_oud'), category: t('cat_luxury'), span: "row-span-2" },
+    { id: "stone-minimal", img: t5, title: t('tmpl_stone_minimal'), category: t('cat_lifestyle'), span: "" },
+  ];
+
+  const newItems = Object.keys(templateImageMap)
+    .sort((a, b) => {
+      const numA = parseInt(a.split("-")[1]);
+      const numB = parseInt(b.split("-")[1]);
+      return numA - numB;
+    })
+    .map(id => ({
+      id,
+      img: templateImageMap[id],
+      title: `${t('template')} ${id.split("-")[1]}`,
+      category: t('cat_all'),
+      span: ""
+    }));
+
+  return [...baseItems, ...newItems];
+};
 
 const getCategories = (t: any) => [
   { id: 'All', label: t('cat_all') },
@@ -98,18 +117,17 @@ export function TemplateGallery() {
 
       const productUpload = await fal.storage.upload(productFile);
 
-      const tmplRes = await fetch(templateImgSrc);
-      const tmplBlob = await tmplRes.blob();
-      const tmplFile = new File([tmplBlob], "template.jpg", { type: tmplBlob.type });
-      const templateUpload = await fal.storage.upload(tmplFile);
-
-      const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
-        input: {
-          prompt: `Image 1 is the template, Image 2 is the product. Replace the product in the template using the uploaded product image.
+      // Get the prompt for the selected template
+      const specificPrompt = (selectedTemplate ? templatePrompts[selectedTemplate] : null) || `
+Replace the product in the template using the uploaded product image.
 Maintain exact shadows, reflections, perspective, lighting,
 camera angle, and commercial advertising style.
-Ultra realistic product photography.`,
-          image_urls: [templateUpload, productUpload],
+Ultra realistic product photography.`;
+
+      const result = await fal.subscribe("fal-ai/flux-pro/kontext", {
+        input: {
+          prompt: specificPrompt,
+          image_url: productUpload,
           num_images: 1,
           output_format: "png",
           safety_tolerance: "2",
@@ -177,9 +195,13 @@ Ultra realistic product photography.`,
   const items = getItems(t);
   const categories = getCategories(t);
   const filtered = active === "All" ? items : items.filter((i) => i.category === active);
-  const INITIAL_COUNT = 9;
+  const INITIAL_COUNT = 10;
   const hasMore = filtered.length > INITIAL_COUNT;
   const visibleItems = showAll ? filtered : filtered.slice(0, INITIAL_COUNT);
+
+  // Calculate if the total cells on mobile (2 cols) will leave the last item alone
+  const totalCells = visibleItems.reduce((acc, it) => acc + (it.span.includes('row-span-2') ? 2 : 1), 0);
+  const isOddCells = totalCells % 2 !== 0;
 
   return (
     <section id="templates" className="relative py-32">
@@ -206,15 +228,18 @@ Ultra realistic product photography.`,
 
         <div className="relative">
           <div className="mt-12 grid grid-flow-dense auto-rows-[180px] grid-cols-2 gap-4 sm:auto-rows-[220px] md:grid-cols-3 lg:grid-cols-4">
-          {visibleItems.map((it, i) => (
+          {visibleItems.map((it, i) => {
+            const isLast = i === visibleItems.length - 1;
+            const extraSpan = isLast && isOddCells ? "col-span-2 md:col-span-1" : "";
+            return (
             <motion.div
-              key={it.title}
+              key={it.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-50px" }}
               transition={{ duration: 0.6, delay: i * 0.05 }}
               onClick={() => setSelectedTemplate(selectedTemplate === it.id ? null : it.id)}
-              className={`group ring-border-gradient relative overflow-hidden rounded-2xl shadow-card cursor-pointer transition-all ${it.span} ${selectedTemplate === it.id ? 'ring-primary shadow-glow' : ''}`}
+              className={`group ring-border-gradient relative overflow-hidden rounded-2xl shadow-card cursor-pointer transition-all ${it.span} ${extraSpan} ${selectedTemplate === it.id ? 'ring-primary shadow-glow' : ''}`}
             >
               <img
                 src={it.img}
@@ -277,7 +302,7 @@ Ultra realistic product photography.`,
                 )}
               </AnimatePresence>
             </motion.div>
-          ))}
+          )})}
           </div>
 
           {/* Gradient Fade Overlay (when collapsed) */}

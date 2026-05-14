@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { Upload, Wand2, ImageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import templateImg from "@/assets/gallery-5.jpg";
-import productImg from "@/assets/1 (1).jpg";
-import resultImg from "@/assets/generated-ad (1).png";
+import templateImg from "@/assets/template/5 (1).jpg";
+import productImg from "@/assets/template/1 (1).jpg";
+import resultImg from "@/assets/template/3 (1).jpg";
 
 function Card({
   label,
